@@ -1,4 +1,9 @@
-"""StoryCLI: CLI tool to download audiobooks from Storytel."""
+
+"""
+StoryCLI: CLI tool for downloading audiobooks from Storytel. Requires an active Storytel
+account. To use this tool, create the file "~/.storycli" and put your login credentials
+here. 
+"""
 
 from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
 from cryptography.hazmat.primitives import padding
@@ -12,6 +17,8 @@ import sys
 
 
 class LoginInfo:
+    """Manage login credentials and required password hashing."""
+
     KEY = b"VQZBJ6TD8M9WBUWT"
     IV = b"joiwef08u23j341a"
 
@@ -31,12 +38,16 @@ class LoginInfo:
 
 
 class AccountInfo:
+    """Helper class for managing tokens."""
+
     def __init__(self, jwt: str, sst: str):
         self.jwt = jwt
         self.sst = sst
 
 
 class BookData:
+    """Helper class for managing and representing book objects."""
+
     def __init__(self, id: int, title: str, authors: str, length: int, description: str):
         self.id = id
         self.title = title
@@ -46,12 +57,18 @@ class BookData:
 
 
 class StoryAPI:
+    """Manage access to Storytel API endpoints."""
+
     CHUNK_SIZE = 1048576  # 1 MB
 
     def __init__(self):
         self.accountInfo: AccountInfo | None = None
 
     def login(self, loginInfo: LoginInfo) -> bool:
+        """
+        Login to Storytel using given `LoginInfo` object.
+        Returns True if login successful. Returns False if something fails.
+        """
         url = f"https://www.storytel.com/api/login.action?m=1&uid={loginInfo.email.strip()}&pwd={loginInfo.password}"
         try:
             response = requests.get(url)
@@ -67,6 +84,11 @@ class StoryAPI:
         return False
 
     def searchBook(self, query: str) -> tuple[bool, list[BookData]]:
+        """
+        Search by given query. Returns a tuple with a bool representing status
+        and a list of `BookData` objects. Doesn't work if not logged in.
+        Bool is True if everything is successful. False otherwise.
+        """
         if self.accountInfo is None:
             return (False, [])
         try:
@@ -89,6 +111,11 @@ class StoryAPI:
             return (False, [])
 
     def downloadBook(self, bookId: int, path: Path) -> bool:
+        """
+        Download the audiobook represented by the `bookId` to `path`.
+        Returns False if something fails or not logged in. True if
+        successful.
+        """
         if self.accountInfo is None:
             return False
         url = f"https://www.storytel.com/mp3streamRangeReq?startposition=0&programId={bookId}&token={self.accountInfo.sst}"
@@ -109,19 +136,30 @@ class StoryAPI:
 
 
 class StoryCLI:
+    """Represents the CLI command/tool."""
+
     LOGIN_FILE_PATH = Path("~/.storycli")
 
     def __init__(self):
         self.api = StoryAPI()
         login_info = self.__loadLoginInfo()
+
+        # self.status represents the status of the login procedure.
+        # 0: LoginInfo loaded and logged in correctly.
+        # 1: Unable to load LoginInfo. File could be missing.
+        # 2: Login failed. Credentials could be wrong.
+        self.status = 0 
         if login_info is None:
             self.status = 1
         elif not self.api.login(login_info):
             self.status = 2
-        else:
-            self.status = 0
 
     def __loadLoginInfo(self) -> LoginInfo | None:
+        """
+        Try loading the `LOGIN_FILE_PATH` file, which contains credentials
+        in `.env` file format. If successful, return `LoginInfo`. Return
+        None otherwise.
+        """
         dotenv.load_dotenv(self.LOGIN_FILE_PATH.expanduser())
         email = os.getenv("STORYCLI_MAIL")
         password = os.getenv("STORYCLI_PASS")
@@ -130,34 +168,38 @@ class StoryCLI:
         return None
 
     def search(self, query: str) -> tuple[bool, list[BookData]]:
+        """
+        Search by given query. Returns a tuple with a bool representing status
+        and a list of `BookData` objects. Doesn't work if not logged in.
+        Bool is True if everything is successful. False otherwise.
+        """
         return self.api.searchBook(query) if self.status == 0 else (False, [])
 
-    def description(self, bookId: int) -> tuple[bool, str | None]:
-        success, books = self.search(str(bookId))
-        for book in books:
-            if book.id == bookId:
-                return (True, book.description)
-        return (success, None)
-
     def download(self, bookId: int, path: Path) -> bool:
+        """
+        Download the audiobook represented by the `bookId` to `path`.
+        Returns False if something fails or not logged in. True if
+        successful.
+        """
         return self.status == 0 and self.api.downloadBook(bookId, path)
 
 
-def format_length(length: int) -> str:
-    seconds = length // 1000
-    hours = seconds // 3600
-    minutes = (seconds % 3600) // 60
-    return f"{hours}:{minutes}:{seconds % 60}"
-
-
 def main(argv: list[str] | None = None) -> int:
+    """Main CLI command function."""
+
+    def format_length(length: int) -> str:
+        """Return milliseconds `length` in human-readable format."""
+        seconds = length // 1000
+        hours = seconds // 3600
+        minutes = (seconds % 3600) // 60
+        return f"{hours}:{minutes}:{seconds % 60}"
+
     parser = argparse.ArgumentParser(description="Search and download Storytel audiobooks.")
     operations = parser.add_mutually_exclusive_group(required=True)
     operations.add_argument("-q", "--query", metavar="QUERY", help="search for audiobooks")
-    operations.add_argument("-d", "--desc", type=int, metavar="BOOK_ID", help="show a book description")
     operations.add_argument("-D", "--download", type=int, metavar="BOOK_ID", help="download an audiobook")
     parser.add_argument("-o", "--output", type=Path, metavar="PATH", help="MP3 output path (required with --download)")
-    parser.add_argument("-H", "--human-readable", action="store_true", help="format query lengths as hours:minutes:seconds")
+    parser.add_argument("-H", "--human-readable", action="store_true", help="do not format query lengths as hours:minutes:seconds")
     args = parser.parse_args(argv)
 
     if args.download is not None and args.output is None:
@@ -179,22 +221,11 @@ def main(argv: list[str] | None = None) -> int:
             print("error: search failed", file=sys.stderr)
             return 3
         for book in books:
-            length = format_length(book.length) if args.human_readable else str(book.length)
+            length = format_length(book.length) if not args.human_readable else str(book.length)
             print(f"{str(book.id).rjust(10)}  {length.rjust(8)}  {book.title}")
         return 0
 
-    if args.desc is not None:
-        success, description = cli.description(args.desc)
-        if not success:
-            print("error: description lookup failed", file=sys.stderr)
-            return 3
-        if description is None:
-            print(f"error: book {args.desc} was not found", file=sys.stderr)
-            return 4
-        print(description)
-        return 0
-
-    if cli.download(args.download, args.output):
+    if cli.download(args.download, args.output): # type: ignore
         return 0
     print(f"error: download failed for book {args.download}", file=sys.stderr)
     return 3
