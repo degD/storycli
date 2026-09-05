@@ -1,7 +1,7 @@
 [project]
-name = "cli"
+name = "storycli"
 version = "0.1.0"
-description = "Add your description here"
+description = "StoryCLI: CLI tool for downloading audiobooks from Storytel."
 readme = "README.md"
 authors = [
     { name = "degD", email = "degd@degd.net" }
@@ -15,7 +15,7 @@ dependencies = [
 ]
 
 [project.scripts]
-storycli = "cli:main"
+storycli = "storycli:main"
 
 [build-system]
 requires = ["uv_build>=0.12.9,<0.13.0"]
