@@ -1,12 +1,18 @@
 [project]
 name = "storycli"
-version = "0.1.0"
+version = "0.1.1"
 description = "StoryCLI: CLI tool for downloading audiobooks from Storytel."
 readme = "README.md"
+license = "MIT"
+license-files = ["LICEN[CS]E*"]
 authors = [
     { name = "degD", email = "degd@degd.net" }
 ]
 requires-python = ">=3.12"
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Operating System :: OS Independent",
+]
 dependencies = [
     "cryptography>=50.0.1",
     "python-dotenv>=1.2.3",
@@ -16,6 +22,10 @@ dependencies = [
 
 [project.scripts]
 storycli = "storycli:main"
+
+[project.urls]
+Homepage = "https://github.com/degD/storycli"
+Issues = "https://github.com/degD/storycli/issues"
 
 [build-system]
 requires = ["uv_build>=0.12.9,<0.13.0"]
